@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+dist/
+build/
+env/
+venv/
+ENV/
+.venv/
+
+# Django
+*.log
+*.pot
+*.pyc
+db.sqlite3
+media/
+staticfiles/
+local_settings.py
+instance/
+.settings/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# VS Code
+.vscode/
+
+# MacOS
+.DS_Store
+
+# PyCharm
+.idea/
+
+# Environments and config
+.env
+.env.*
+
+# Migrations
+**/migrations/
+!**/migrations/__init__.py
+
+# Coverage
+htmlcov/
+coverage.xml
+.cache
+.tox/
+.nox/
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+
+# Logs
+*.log
+
+# Pandas export/import
+*.csv
+*.xls
+*.xlsx
+
+# Swagger/OpenAPI
+swagger.json
+swagger.yaml
