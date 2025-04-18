@@ -4,9 +4,11 @@ from rest_framework.exceptions import ValidationError
 
 
 class WalletSerializer(serializers.ModelSerializer):
+    asset = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+
     class Meta:
         model = Wallet
-        fields = ["balance"]
+        fields = ["balance", "asset"]
 
 
 class ExpenseSerializer(serializers.ModelSerializer):

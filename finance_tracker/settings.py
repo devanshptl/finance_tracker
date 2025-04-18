@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "finance_app",
     "accounts",
+    "portfolio",
 ]
 
 MIDDLEWARE = [
