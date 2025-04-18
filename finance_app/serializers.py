@@ -25,7 +25,8 @@ class ExpenseSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = self.context["request"].user
-        wallet = Wallet.objects.get(user=user)
+        wallet, _ = Wallet.objects.get_or_create(user=user)
+
         expense_amount = validated_data["amount"]
 
         if wallet.balance < expense_amount:
@@ -38,6 +39,21 @@ class ExpenseSerializer(serializers.ModelSerializer):
         wallet.save()
 
         return expense
+
+    def update(self, instance, validated_data):
+        user = self.context["request"].user
+        wallet, _ = Wallet.objects.get_or_create(user=user)
+
+        old_amount = instance.amount
+        new_amount = validated_data.get("amount", old_amount)
+
+        instance = super().update(instance, validated_data)
+
+        # Adjust wallet balance if expense amount changes
+        wallet.balance += old_amount - new_amount
+        wallet.save()
+
+        return instance
 
 
 class IncomeSerializer(serializers.ModelSerializer):
