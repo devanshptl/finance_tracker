@@ -3,7 +3,7 @@ from .models import Investment
 from django.db import models
 from finance_app.models import Wallet
 from rest_framework.exceptions import ValidationError
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 from datetime import date
 import yfinance as yf
 
@@ -27,7 +27,7 @@ class InvestmentSerializer(serializers.ModelSerializer):
             data.pop("sip_frequency", None)
             data.pop("sip_end_date", None)
 
-        # If is_manual is False, hide price from frontend
+        # Hide price if not manually entered
         if not instance.is_manual:
             data.pop("price", None)
 
@@ -60,19 +60,25 @@ class InvestmentSerializer(serializers.ModelSerializer):
         return attrs
 
     def get_total_amount(self, obj):
-        return float(
-            (Decimal(str(obj.quantity)) * Decimal(str(obj.current_price))).quantize(
+        try:
+            quantity = Decimal(str(obj.quantity))
+            current_price = Decimal(str(obj.current_price))
+            total_amount = (quantity * current_price).quantize(
                 Decimal("0.01"), rounding=ROUND_HALF_UP
             )
-        )
+            return float(total_amount)
+        except (InvalidOperation, ValueError, TypeError):
+            raise ValidationError(
+                {"detail": "Invalid quantity or current price value."}
+            )
 
     def get_live_price(self, symbol):
         try:
             stock = yf.Ticker(symbol)
-            price = stock.info.get("regularMarketPrice", None)
-            if price is not None:
-                return Decimal(str(price))
-            raise ValueError(f"No price found for {symbol}")
+            price = stock.info.get("regularMarketPrice")
+            if price is None:
+                raise ValueError(f"No price found for {symbol}")
+            return Decimal(str(price))
         except Exception as e:
             raise ValidationError(
                 {"detail": f"Failed to fetch price for {symbol}: {str(e)}"}
@@ -85,86 +91,85 @@ class InvestmentSerializer(serializers.ModelSerializer):
 
         wallet, _ = Wallet.objects.get_or_create(user=user)
         transaction_type = validated_data["transaction_type"]
-        quantity = validated_data["quantity"]
+        quantity = Decimal(str(validated_data["quantity"]))
         symbol = validated_data["symbol"]
 
-        if transaction_type == "buy":
-            if validated_data.get("is_manual", False):
-                price = validated_data["price"]
-                amount = Decimal(str(quantity * price))
-            else:
-                # Fetch live price
-                price = self.get_live_price(symbol)
-                validated_data["price"] = price
-                validated_data["date"] = date.today()
-                validated_data["current_price"] = price
-                amount = Decimal(str(quantity)) * price
-
-            # Balance update for buying
-            if wallet.balance < amount:
-                raise ValidationError({"detail": "Insufficient wallet balance to buy."})
-            wallet.balance -= amount
-
-            # Save investment
-            wallet.save()
-            return super().create(validated_data)
-        else:
+        if transaction_type != "buy":
             raise ValidationError(
                 {"detail": "Only buy transactions can be created here."}
             )
 
+        if validated_data.get("is_manual", False):
+            price = Decimal(str(validated_data["price"]))
+            validated_data["current_price"] = price
+        else:
+            price = self.get_live_price(symbol)
+            validated_data["price"] = price
+            validated_data["current_price"] = price
+            validated_data["date"] = date.today()
+
+        amount = (quantity * price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        wallet.balance = Decimal(str(wallet.balance))
+
+        if wallet.balance < amount:
+            raise ValidationError({"detail": "Insufficient wallet balance to buy."})
+
+        wallet.balance -= amount
+        wallet.save()
+
+        return super().create(validated_data)
+
     def update(self, instance, validated_data):
         wallet, _ = Wallet.objects.get_or_create(user=instance.user)
 
-        # Revert old transaction if updating an existing record
-        old_amount = Decimal(str(instance.quantity)) * Decimal(str(instance.price))
+        # Revert old transaction
+        old_quantity = Decimal(str(instance.quantity))
+        old_price = Decimal(str(instance.price))
+        old_amount = (old_quantity * old_price).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
 
-        if instance.transaction_type == "buy":
-            wallet.balance += old_amount
-        elif instance.transaction_type == "sell":
-            wallet.balance -= old_amount
+        wallet.balance = Decimal(str(wallet.balance))
+        wallet.balance += old_amount  # Revert previous balance change
 
-        # Prepare new transaction details
-        new_quantity = validated_data.get("quantity", instance.quantity)
-        new_price = validated_data.get("price", instance.price)
+        # New transaction
+        new_quantity = Decimal(str(validated_data.get("quantity", instance.quantity)))
+        new_price = Decimal(str(validated_data.get("price", instance.price)))
         new_transaction_type = validated_data.get(
             "transaction_type", instance.transaction_type
         )
-        new_amount = Decimal(str(new_quantity)) * Decimal(str(new_price))
+        new_amount = (new_quantity * new_price).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
 
         if new_transaction_type == "buy":
-            # Ensure sufficient wallet balance for buy transaction
             if wallet.balance < new_amount:
                 raise ValidationError(
                     {"detail": "Insufficient wallet balance to update this buy."}
                 )
             wallet.balance -= new_amount
+
         elif new_transaction_type == "sell":
-            # Ensure the user owns enough stocks to sell
             owned_quantity = (
                 Investment.objects.filter(
                     user=instance.user, asset_type="stock", symbol=instance.symbol
                 ).aggregate(total_quantity=models.Sum("quantity"))["total_quantity"]
                 or 0
             )
-
             if owned_quantity < new_quantity:
                 raise ValidationError(
                     {"detail": f"Insufficient stock of {instance.symbol} to sell."}
                 )
 
-            # Decrease the quantity of stocks the user owns
             investment = Investment.objects.filter(
                 user=instance.user, asset_type="stock", symbol=instance.symbol
             ).first()
-
             if investment:
                 investment.quantity -= new_quantity
                 investment.save()
 
-            # Update wallet balance for sell transaction
             wallet.balance += new_amount
 
-        # Save changes to wallet
         wallet.save()
         return super().update(instance, validated_data)
