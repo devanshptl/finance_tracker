@@ -1,62 +1,80 @@
-# Python
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-*.egg
-*.egg-info/
-dist/
+*.pyo
+*.pyd
+*.pdb
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.pytest_cache/
+
+# Django stuff
+*.log
+local_settings.py
+db.sqlite3
+media/
+staticfiles/
+instance/
+.settings/
+
+# Migrations but keep __init__.py
+**/migrations/*
+!**/migrations/__init__.py
+
+# Environments
+.env
+.env.*
 env/
 venv/
 ENV/
 .venv/
 
-# Django
-*.log
-*.pot
-*.pyc
-db.sqlite3
-media/
-staticfiles/
-local_settings.py
-instance/
-.settings/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# VS Code
+# IDEs and editors
 .vscode/
-
-# MacOS
+.idea/
 .DS_Store
 
-# PyCharm
-.idea/
+# Jupyter Notebook
+.ipynb_checkpoints/
 
-# Environments and config
-.env
-.env.*
-
-# Migrations
-**/migrations/
-!**/migrations/__init__.py
-
-# Coverage
-htmlcov/
-coverage.xml
-.cache
-.tox/
-.nox/
-.pytest_cache/
-
-# mypy
+# MyPy
 .mypy_cache/
 .dmypy.json
 
-# Logs
-*.log
-
-# Pandas export/import
+# Exported data
 *.csv
 *.xls
 *.xlsx
