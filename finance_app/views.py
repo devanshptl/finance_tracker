@@ -2,10 +2,11 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import Expense, Wallet
-from .serializers import ExpenseSerializer, WalletSerializer
+from .models import Expense, Wallet, Income
+from .serializers import ExpenseSerializer, WalletSerializer, IncomeSerializer
 from rest_framework.generics import ListCreateAPIView, UpdateAPIView
 from decimal import Decimal, InvalidOperation
+from django.shortcuts import get_object_or_404
 
 
 class ExpenseListCreateAPIView(ListCreateAPIView):
@@ -81,3 +82,52 @@ class WalletCreateAPIView(APIView):
             serializer.data,
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+
+
+class IncomeAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, pk, user):
+        return get_object_or_404(Income, pk=pk, user=user)
+
+    def get(self, request, pk=None, *args, **kwargs):
+        if pk is None:
+            incomes = Income.objects.filter(user=request.user).order_by("-date")
+            serializer = IncomeSerializer(incomes, many=True)
+            return Response(serializer.data)
+        else:
+            income = self.get_object(pk, request.user)
+            serializer = IncomeSerializer(income)
+            return Response(serializer.data)
+
+    def post(self, request, *args, **kwargs):
+        serializer = IncomeSerializer(data=request.data, context={"request": request})
+        if serializer.is_valid():
+            serializer.save()  # Wallet balance is updated in serializer
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request, pk, *args, **kwargs):
+        income = self.get_object(pk, request.user)
+        serializer = IncomeSerializer(
+            income, data=request.data, context={"request": request}
+        )
+        if serializer.is_valid():
+            serializer.save()  # Wallet update logic can be handled here if needed
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, pk, *args, **kwargs):
+        income = self.get_object(pk, request.user)
+        serializer = IncomeSerializer(
+            income, data=request.data, partial=True, context={"request": request}
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk, *args, **kwargs):
+        income = self.get_object(pk, request.user)
+        income.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

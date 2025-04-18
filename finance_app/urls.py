@@ -4,6 +4,7 @@ from .views import (
     ExpenseUpdateAPIView,
     ExpensePartialUpdateAPIView,
     WalletCreateAPIView,
+    IncomeAPIView,
 )
 
 urlpatterns = [
@@ -15,4 +16,6 @@ urlpatterns = [
         name="expense-partial-update",
     ),
     path("wallet/", WalletCreateAPIView.as_view(), name="wallet-detail"),
+    path("incomes/", IncomeAPIView.as_view(), name="income-list-create"),
+    path("incomes/<int:pk>/", IncomeAPIView.as_view(), name="income-detail"),
 ]
