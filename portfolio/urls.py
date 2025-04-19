@@ -1,5 +1,10 @@
 from django.urls import path
-from .views import BuyInvestmentAPIView, SellInvestmentAPIView
+from .views import (
+    BuyInvestmentAPIView,
+    SellInvestmentAPIView,
+    StartSIPAPIView,
+    StopSIPAPIView,
+)
 
 urlpatterns = [
     path(
@@ -19,5 +24,25 @@ urlpatterns = [
         "investments/sell/<int:pk>/",
         SellInvestmentAPIView.as_view(),
         name="sell-investment-detail",
+    ),
+    path(
+        "investments/sip/start/",
+        StartSIPAPIView.as_view(),
+        name="start-sip",
+    ),
+    path(
+        "investments/sip/stop/",
+        StopSIPAPIView.as_view(),
+        name="stop-sip",
+    ),
+    path(
+        "investments/sip/start/<int:investment_id>/",
+        StartSIPAPIView.as_view(),
+        name="start-sip-detail",
+    ),
+    path(
+        "investments/sip/stop/<int:investment_id>/",
+        StopSIPAPIView.as_view(),
+        name="stop-sip-detail",
     ),
 ]

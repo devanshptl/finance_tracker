@@ -1,6 +1,8 @@
 from django.db import models
 from django.core.validators import *
 from django.contrib.auth.models import User
+from django.utils import timezone
+from datetime import timedelta
 
 
 class Investment(models.Model):
@@ -13,6 +15,12 @@ class Investment(models.Model):
     TRANSACTION_TYPES = [
         ("buy", "Buy"),
         ("sell", "Sell"),
+    ]
+
+    SIP_FREQUENCIES = [
+        ("daily", "Daily"),
+        ("weekly", "Weekly"),
+        ("monthly", "Monthly"),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -29,10 +37,14 @@ class Investment(models.Model):
     current_price = models.FloatField(null=True, blank=True)
     is_manual = models.BooleanField(default=False)
 
-    # Optional fields for SIPs
+    # SIP fields
     sip_start_date = models.DateField(null=True, blank=True)
-    sip_frequency = models.CharField(max_length=20, null=True, blank=True)
+    sip_frequency = models.CharField(
+        max_length=20, choices=SIP_FREQUENCIES, null=True, blank=True
+    )
     sip_end_date = models.DateField(null=True, blank=True)
+    is_sip_active = models.BooleanField(default=False)
+    next_sip_date = models.DateField(null=True, blank=True)  # Track next execution
 
     def total_invested(self):
         return self.quantity * self.price if self.transaction_type == "buy" else 0
@@ -49,3 +61,24 @@ class Investment(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.asset_type} - {self.symbol} - {self.transaction_type}"
+
+    def initialize_sip(self):
+        """Initialize SIP next date when created."""
+        if self.asset_type == "sip" and self.sip_start_date:
+            self.is_sip_active = True
+            self.next_sip_date = self.sip_start_date
+            self.save()
+
+    def update_next_sip_date(self):
+        """Update the next_sip_date based on frequency after each execution."""
+        if self.sip_frequency == "daily":
+            self.next_sip_date += timedelta(days=1)
+        elif self.sip_frequency == "weekly":
+            self.next_sip_date += timedelta(weeks=1)
+        elif self.sip_frequency == "monthly":
+            next_month = self.next_sip_date.month % 12 + 1
+            year_increment = self.next_sip_date.month // 12
+            self.next_sip_date = self.next_sip_date.replace(
+                year=self.next_sip_date.year + year_increment, month=next_month
+            )
+        self.save()

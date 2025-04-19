@@ -1,10 +1,11 @@
 from django.shortcuts import render
 from accounts.serializers import *
 from rest_framework.response import Response
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from accounts import models
+from rest_framework.permissions import AllowAny
 
 # Create your views here.
 
@@ -14,6 +15,7 @@ from accounts import models
         "POST",
     ]
 )
+@permission_classes([AllowAny])
 def user_registartion(request):
 
     if request.method == "POST":
