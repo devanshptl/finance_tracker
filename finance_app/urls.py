@@ -3,6 +3,8 @@ from .views import (
     ExpenseAPIView,
     WalletCreateAPIView,
     IncomeAPIView,
+    MonthlySummaryAPIView,
+    MonthlyReportEmailAPIView,
 )
 
 urlpatterns = [
@@ -11,4 +13,10 @@ urlpatterns = [
     path("wallet/", WalletCreateAPIView.as_view(), name="wallet-detail"),
     path("incomes/", IncomeAPIView.as_view(), name="income-list-create"),
     path("incomes/<int:pk>/", IncomeAPIView.as_view(), name="income-detail"),
+    path("summary/", MonthlySummaryAPIView.as_view(), name="monthly-summary"),
+    path(
+        "send_monthly_report/",
+        MonthlyReportEmailAPIView.as_view(),
+        name="send_monthly_report",
+    ),
 ]

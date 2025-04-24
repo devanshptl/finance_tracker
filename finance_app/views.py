@@ -6,6 +6,11 @@ from .models import Expense, Wallet, Income
 from .serializers import ExpenseSerializer, WalletSerializer, IncomeSerializer
 from decimal import Decimal, InvalidOperation
 from django.shortcuts import get_object_or_404
+from .analytics import get_monthly_summary
+from .charts import plot_monthly_income_expense, plot_expense_category_pie
+from .report import generate_monthly_report_pdf
+from .tasks import send_report_to_email_async
+import base64
 
 
 class ExpenseAPIView(APIView):
@@ -139,3 +144,39 @@ class IncomeAPIView(APIView):
         income = self.get_object(pk, request.user)
         income.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class MonthlySummaryAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        summary_data = get_monthly_summary(request.user)
+        return Response(summary_data)
+
+
+class ChartPreviewAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        income_expense_chart = plot_monthly_income_expense(request.user)
+        category_pie_chart = plot_expense_category_pie(request.user)
+
+        return Response(
+            {
+                "monthly_chart": income_expense_chart,
+                "category_pie_chart": category_pie_chart,
+            }
+        )
+
+
+class MonthlyReportEmailAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        pdf_buffer = generate_monthly_report_pdf(request.user)
+
+        pdf_base64 = base64.b64encode(pdf_buffer.read()).decode("utf-8")
+
+        send_report_to_email_async.delay(request.user.id, pdf_base64)
+
+        return Response({"detail": "Report sent to your email."})
