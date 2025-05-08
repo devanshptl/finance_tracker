@@ -7,6 +7,8 @@ from .serializers import InvestmentSerializer
 from rest_framework.exceptions import ValidationError
 from django.utils import timezone
 from datetime import timedelta
+from rest_framework.permissions import IsAuthenticated
+import pandas as pd
 
 
 class BuyInvestmentAPIView(APIView):
@@ -327,3 +329,91 @@ class StopSIPAPIView(APIView):
             except ValidationError as e:
                 return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PortfolioAnalyticsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        # Only consider "buy" transactions for portfolio analysis
+        investments = Investment.objects.filter(user=user, transaction_type="buy")
+
+        if not investments.exists():
+            return Response({"message": "No investments found."}, status=404)
+
+        # Build data from investments
+        data = []
+        for inv in investments:
+            data.append(
+                {
+                    "name": inv.name,
+                    "symbol": inv.symbol,
+                    "asset_type": inv.asset_type,
+                    "quantity": inv.quantity,
+                    "buy_price": inv.price,  # buy price is "price" field
+                    "current_price": inv.current_price or inv.price,  # fallback
+                    "date_invested": inv.date,
+                    "invested_value": inv.total_invested(),
+                    "current_value": inv.current_value(),
+                    "return_percentage": inv.returns_percentage(),
+                }
+            )
+
+        df = pd.DataFrame(data)
+
+        # 1. Time-series Portfolio Growth
+        portfolio_growth = (
+            df.groupby("date_invested")[["invested_value", "current_value"]]
+            .sum()
+            .cumsum()
+        )
+
+        time_series = {
+            "dates": pd.to_datetime(portfolio_growth.index)
+            .strftime("%Y-%m-%d")
+            .tolist(),
+            "invested_value": portfolio_growth["invested_value"].tolist(),
+            "current_value": portfolio_growth["current_value"].tolist(),
+        }
+
+        # 2. Investment by Asset Type
+        asset_distribution = df.groupby("asset_type")["current_value"].sum()
+
+        asset_breakdown = {
+            "labels": asset_distribution.index.tolist(),
+            "values": asset_distribution.values.tolist(),
+        }
+
+        # 3. Top Performers
+        top_performers = df.sort_values(by="return_percentage", ascending=False).head(5)
+        top_performers_list = top_performers[
+            ["name", "symbol", "return_percentage"]
+        ].to_dict(orient="records")
+
+        # 4. Volatility
+        volatility = df["return_percentage"].std()
+
+        # Final Response
+        return Response(
+            {
+                "time_series": time_series,
+                "asset_breakdown": asset_breakdown,
+                "top_performers": top_performers_list,
+                "volatility": round(volatility, 2),
+                "total_invested": round(df["invested_value"].sum(), 2),
+                "current_portfolio_value": round(df["current_value"].sum(), 2),
+                "overall_returns_percentage": (
+                    round(
+                        (
+                            (df["current_value"].sum() - df["invested_value"].sum())
+                            / df["invested_value"].sum()
+                        )
+                        * 100,
+                        2,
+                    )
+                    if df["invested_value"].sum()
+                    else 0
+                ),
+            }
+        )

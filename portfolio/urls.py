@@ -4,6 +4,7 @@ from .views import (
     SellInvestmentAPIView,
     StartSIPAPIView,
     StopSIPAPIView,
+    PortfolioAnalyticsView,
 )
 
 urlpatterns = [
@@ -45,4 +46,5 @@ urlpatterns = [
         StopSIPAPIView.as_view(),
         name="stop-sip-detail",
     ),
+    path("analytics/", PortfolioAnalyticsView.as_view(), name="portfolio-analytics"),
 ]
